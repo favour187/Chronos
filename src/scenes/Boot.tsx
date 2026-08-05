@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
+import { Canvas, useLoader } from '@react-three/fiber'
+import * as THREE from 'three'
 import { useGame } from '../store/game'
 import { Particles } from '../components/scene/Particles'
-import { Canvas } from '@react-three/fiber'
 import { sfx } from '../audio/engine'
 
 export function Boot() {
@@ -31,6 +32,7 @@ export function Boot() {
     <div className="boot-wrap">
       <Canvas camera={{ position: [0, 0, 6], fov: 55 }} dpr={[1, 2]}>
         <color attach="background" args={['#05050d']} />
+        <BootBackdrop />
         <ambientLight intensity={0.2} />
         <Particles count={600} color="#ffd700" size={0.07} radius={14} shape="sphere" speed={0.3} />
         <Particles count={200} color="#00d4ff" size={0.05} radius={10} shape="dust" speed={0.2} />
@@ -42,7 +44,7 @@ export function Boot() {
           <div className="boot-bar-fill" style={{ width: `${pct}%` }} />
         </div>
         <div className="boot-pct">{pct}%</div>
-        <div className="boot-hint">Aligning temporal coordinates\u2026</div>
+        <div className="boot-hint">Aligning temporal coordinates…</div>
         <button
           className="boot-unmute"
           onClick={() => {
@@ -54,5 +56,18 @@ export function Boot() {
         </button>
       </div>
     </div>
+  )
+}
+
+function BootBackdrop() {
+  const tex = useLoader(THREE.TextureLoader, '/images/hero.jpg')
+  useEffect(() => {
+    if (tex) tex.colorSpace = THREE.SRGBColorSpace
+  }, [tex])
+  return (
+    <mesh scale={[600, 600, 600]} renderOrder={-1000}>
+      <sphereGeometry args={[1, 64, 32]} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} depthWrite={false} transparent opacity={0.35} />
+    </mesh>
   )
 }

@@ -7,8 +7,6 @@ import { Player } from '../components/scene/Player'
 import { Particles } from '../components/scene/Particles'
 import { Portal } from '../components/scene/Portal'
 import { Artifact } from '../components/scene/Artifact'
-import { Sky } from '../components/scene/Sky'
-import { Ground } from '../components/scene/Ground'
 import { EraWorld } from './EraWorld'
 import { sfx } from '../audio/engine'
 import { HUD } from '../components/ui/HUD'
@@ -23,7 +21,6 @@ export function Era() {
 
   useEffect(() => {
     sfx.startAmbient(era.accent)
-    // Voice-style narration (procedural chime + subtitle timing handled in HUD)
     sfx.chime()
     return () => sfx.stopAmbient()
   }, [era.id, era.accent])
@@ -39,30 +36,29 @@ export function Era() {
       <Canvas
         shadows={quality !== 'low'}
         dpr={quality === 'low' ? [1, 1.25] : [1, 2]}
-        camera={{ position: [0, 2.5, 10], fov: 65, near: 0.1, far: 500 }}
+        camera={{ position: [0, 2.5, 10], fov: 65, near: 0.1, far: 2000 }}
       >
         <color attach="background" args={[era.sky]} />
-        <fog attach="fog" args={[era.fog, 15, 60]} />
-        <ambientLight intensity={0.35} color={era.secondary} />
+        <fog attach="fog" args={[era.fog, 20, 90]} />
+        <ambientLight intensity={0.55} color={era.secondary} />
         <directionalLight
           position={[10, 15, 8]}
-          intensity={1.5}
+          intensity={1.2}
           color="#ffffff"
           castShadow={quality !== 'low'}
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
         />
-        <pointLight position={[-8, 6, -6]} intensity={1.5} color={era.accent} distance={30} />
+        <pointLight position={[-8, 6, -6]} intensity={2} color={era.accent} distance={40} />
+        <pointLight position={[0, 4, -14]} intensity={2.5} color={era.accent} distance={30} />
 
         <Suspense fallback={null}>
-          <Sky top={era.sky} bottom={era.fog} />
-          <Ground color={era.ground} accent={era.accent} />
           <EraWorld eraId={era.id} accent={era.accent} />
           <Particles
             count={particleCount}
             color={era.accent}
-            size={0.06}
-            radius={20}
+            size={0.07}
+            radius={25}
             shape="dust"
             speed={0.15}
           />
@@ -78,8 +74,8 @@ export function Era() {
         </Suspense>
 
         <EffectComposer multisampling={0} enableNormalPass={false}>
-          <Bloom intensity={0.9} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
-          <Vignette eskil={false} offset={0.2} darkness={0.8} />
+          <Bloom intensity={1.0} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
+          <Vignette eskil={false} offset={0.2} darkness={0.9} />
         </EffectComposer>
       </Canvas>
       <HUD />

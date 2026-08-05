@@ -1,4 +1,7 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame, useLoader } from '@react-three/fiber'
+import * as THREE from 'three'
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
+import { useRef } from 'react'
 import { useGame } from '../store/game'
 import { Particles } from '../components/scene/Particles'
 import { sfx } from '../audio/engine'
@@ -10,14 +13,19 @@ export function Menu() {
 
   return (
     <div className="menu-wrap">
-      <Canvas camera={{ position: [0, 0, 5], fov: 55 }} dpr={[1, 2]}>
+      <Canvas camera={{ position: [0, 0, 6], fov: 55 }} dpr={[1, 2]} gl={{ antialias: true }}>
         <color attach="background" args={['#05050d']} />
+        <MenuBackdrop />
         <ambientLight intensity={0.3} />
         <pointLight position={[0, 2, 5]} intensity={2} color="#ffd700" />
         <pointLight position={[-4, -1, 2]} intensity={1.5} color="#00d4ff" />
-        <Particles count={900} color="#ffd700" size={0.06} radius={16} shape="sphere" speed={0.25} />
-        <Particles count={500} color="#c470ff" size={0.04} radius={8} shape="dust" speed={0.1} />
+        <Particles count={800} color="#ffd700" size={0.06} radius={16} shape="sphere" speed={0.25} />
+        <Particles count={400} color="#c470ff" size={0.04} radius={8} shape="dust" speed={0.1} />
         <MenuClock />
+        <EffectComposer multisampling={0} enableNormalPass={false}>
+          <Bloom intensity={1.0} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
+          <Vignette eskil={false} offset={0.2} darkness={0.85} />
+        </EffectComposer>
       </Canvas>
       <div className="menu-overlay">
         <div className="menu-eyebrow">A 3D INTERACTIVE JOURNEY</div>
@@ -62,9 +70,22 @@ export function Menu() {
   )
 }
 
-import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
+function MenuBackdrop() {
+  const tex = useLoader(THREE.TextureLoader, '/images/menu-clock.jpg')
+  useEffect_colorSpace(tex)
+  return (
+    <mesh scale={[700, 700, 700]} renderOrder={-1000}>
+      <sphereGeometry args={[1, 64, 32]} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} depthWrite={false} transparent opacity={0.55} />
+    </mesh>
+  )
+}
+
+// tiny helper to set colorSpace after load
+function useEffect_colorSpace(tex: THREE.Texture | undefined) {
+  if (!tex) return
+  tex.colorSpace = THREE.SRGBColorSpace
+}
 
 function MenuClock() {
   const ring = useRef<THREE.Mesh>(null)
@@ -75,7 +96,7 @@ function MenuClock() {
     if (hand.current) hand.current.rotation.z = -t * 0.6
   })
   return (
-    <group position={[0, 0, -2]}>
+    <group position={[0, 0, -4]}>
       <mesh ref={ring}>
         <torusGeometry args={[2.5, 0.05, 16, 128]} />
         <meshStandardMaterial color="#ffd700" emissive="#ffd700" emissiveIntensity={1.5} />
