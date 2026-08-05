@@ -18,7 +18,7 @@ export function EraWorld({ eraId, accent }: Props) {
   const img = era?.image ?? `/images/${eraId}.jpg`
   return (
     <group>
-      <ImageBackdrop src={img} darkness={0.05} tint="#ffffff" parallax={0.15} drift={0.002} />
+      <ImageBackdrop src={img} darkness={0.05}  />
       <GroundFog accent={accent} />
       <EraAccents eraId={eraId} accent={accent} />
     </group>
@@ -57,7 +57,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
         <>
           <FloatingRock color="#ff5a1f" position={[-6, 3, -8]} speed={0.3} />
           <FloatingRock color="#ffb347" position={[5, 4, -10]} speed={-0.25} size={1.2} />
-          <Particles count={200} color="#ff6a00" size={0.12} radius={14} shape="dust" speed={0.4} />
+          <Particles count={60} color="#ff6a00" size={0.1} radius={10} shape="dust" speed={0.2} />
           <Lightning />
         </>
       )
@@ -66,7 +66,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
         <>
           <SwayingFern position={[-4, 0, -6]} />
           <SwayingFern position={[5, 0, -8]} scale={1.3} />
-          <Particles count={300} color={accent} size={0.08} radius={12} shape="dust" speed={0.1} />
+          <Particles count={80} color={accent} size={0.07} radius={10} shape="dust" speed={0.08} />
           <Fireflies color="#aaff88" />
         </>
       )
@@ -74,7 +74,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
       return (
         <>
           <Campfire position={[0, 0, -4]} />
-          <Particles count={250} color="#ff8a3c" size={0.1} radius={10} shape="dust" speed={0.25} />
+          <Particles count={70} color="#ff8a3c" size={0.09} radius={8} shape="dust" speed={0.15} />
           <Fireflies color="#ffc088" />
         </>
       )
@@ -90,7 +90,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
         <>
           <MarbleColumn position={[-3, 0, -5]} />
           <MarbleColumn position={[3, 0, -5]} />
-          <Particles count={200} color={accent} size={0.06} radius={10} shape="dust" speed={0.08} />
+          <Particles count={60} color={accent} size={0.06} radius={8} shape="dust" speed={0.05} />
         </>
       )
     case 'roman-empire':
@@ -114,7 +114,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
       return (
         <>
           <FloatingOrbit color="#e6a366" position={[0, 3, -8]} />
-          <Particles count={200} color={accent} size={0.06} radius={10} shape="dust" speed={0.08} />
+          <Particles count={60} color={accent} size={0.06} radius={8} shape="dust" speed={0.05} />
         </>
       )
     case 'industrial':
@@ -138,14 +138,14 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
         <>
           <FloatingOrbit color={accent} position={[-5, 4, -10]} />
           <FloatingOrbit color="#c490ff" position={[6, 5, -12]} size={0.8} />
-          <Particles count={400} color={accent} size={0.06} radius={14} shape="sphere" speed={0.2} />
+          <Particles count={60} color={accent} size={0.06} radius={10} shape="sphere" speed={0.08} />
         </>
       )
     case 'cosmic':
       return (
         <>
           <NebulaParticles />
-          <Particles count={1000} color="#ffffff" size={0.05} radius={40} shape="sphere" speed={0.02} />
+          <Particles count={120} color="#ffffff" size={0.05} radius={30} shape="sphere" speed={0.01} />
         </>
       )
     default:

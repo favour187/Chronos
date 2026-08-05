@@ -14,6 +14,11 @@ import { FactPanel } from '../components/ui/FactPanel'
 import { InteractionPrompt } from '../components/ui/InteractionPrompt'
 import { MobileControls } from '../components/ui/MobileControls'
 
+const isMobile =
+  typeof window !== 'undefined' &&
+  (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+    window.matchMedia('(max-width: 900px)').matches)
+
 export function Era() {
   const eraIndex = useGame((s) => s.currentEraIndex)
   const era = ERAS[eraIndex]
@@ -27,9 +32,10 @@ export function Era() {
   }, [era.id, era.accent])
 
   const particleCount = useMemo(() => {
+    if (isMobile) return 150
     if (quality === 'low') return 250
-    if (quality === 'med') return 500
-    return 900
+    if (quality === 'med') return 400
+    return 600
   }, [quality])
 
   return (
@@ -37,46 +43,45 @@ export function Era() {
       <Canvas
         shadows={false}
         dpr={[1, isMobile ? 1.5 : 2]}
-        camera={{ position: [0, isMobile ? 2.2 : 2.5, isMobile ? 9 : 10], fov: isMobile ? 62 : 65, near: 0.1, far: 2000 }}
+        camera={{
+          position: isMobile ? [0, 1.4, 7] : [0, 1.8, 9],
+          fov: isMobile ? 55 : 60,
+          near: 0.1,
+          far: 1500,
+        }}
       >
         <color attach="background" args={[era.sky]} />
-        <fog attach="fog" args={[era.fog, 20, 90]} />
-        <ambientLight intensity={0.55} color={era.secondary} />
-        <directionalLight
-          position={[10, 15, 8]}
-          intensity={1.2}
-          color="#ffffff"
-          castShadow={quality !== 'low'}
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-        />
-        <pointLight position={[-8, 6, -6]} intensity={2} color={era.accent} distance={40} />
-        <pointLight position={[0, 4, -14]} intensity={2.5} color={era.accent} distance={30} />
+        <fog attach="fog" args={[era.fog, 20, isMobile ? 70 : 90]} />
+        <ambientLight intensity={0.7} color={'#ffffff'} />
+        <directionalLight position={[0, 8, 4]} intensity={0.8} color={'#ffffff'} />
+        <pointLight position={[0, 2, -6]} intensity={2} color={era.accent} distance={30} />
 
         <Suspense fallback={null}>
           <EraWorld eraId={era.id} accent={era.accent} />
           <Particles
             count={particleCount}
             color={era.accent}
-            size={0.07}
-            radius={25}
+            size={0.08}
+            radius={18}
             shape="dust"
-            speed={0.15}
+            speed={0.12}
           />
-          <Artifact era={era} position={[0, 1.6, -6]} />
-          <Portal
-            position={[0, 2.2, -14]}
-            color={eraIndex < ERAS.length - 1 ? ERAS[eraIndex + 1].accent : '#c470ff'}
-            label={eraIndex < ERAS.length - 1 ? `TRAVEL TO ${ERAS[eraIndex + 1].name.toUpperCase()}` : 'ENTER THE FINALE'}
-            onEnter={nextEra}
-            scale={1.2}
-          />
+          {!isMobile && <Artifact era={era} position={[0, 1.6, -6]} />}
+          {!isMobile && (
+            <Portal
+              position={[0, 2.2, -12]}
+              color={eraIndex < ERAS.length - 1 ? ERAS[eraIndex + 1].accent : '#c470ff'}
+              label={eraIndex < ERAS.length - 1 ? `TRAVEL TO ${ERAS[eraIndex + 1].name.toUpperCase()}` : 'ENTER THE FINALE'}
+              onEnter={nextEra}
+              scale={1.1}
+            />
+          )}
           <Player />
         </Suspense>
 
         <EffectComposer multisampling={0} enableNormalPass={false}>
-          <Bloom intensity={1.0} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
-          <Vignette eskil={false} offset={0.2} darkness={0.9} />
+          <Bloom intensity={isMobile ? 0.6 : 1.0} luminanceThreshold={0.3} luminanceSmoothing={0.9} mipmapBlur />
+          <Vignette eskil={false} offset={0.25} darkness={isMobile ? 1.0 : 0.9} />
         </EffectComposer>
       </Canvas>
       <HUD />
@@ -86,8 +91,3 @@ export function Era() {
     </div>
   )
 }
-
-const isMobile =
-  typeof window !== 'undefined' &&
-  (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
-    window.matchMedia('(max-width: 900px)').matches)
