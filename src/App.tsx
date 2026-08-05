@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ERAS } from './data'
 import { Starfield } from './components/Starfield'
+import { ImmersiveLayer } from './three/ImmersiveLayer'
 
 type Phase = 'boot' | 'menu' | 'intro' | 'era' | 'finale' | 'credits'
 
@@ -271,6 +272,7 @@ export default function App() {
             <div className="era-gold" />
             <div className="era-vignette" />
           </div>
+          <ImmersiveLayer accent={era.accent} artifactEmoji={era.quote} eraIndex={eraIdx} />
 
           <header className="hud-top">
             <div className="hud-logo">CHRONOS</div>

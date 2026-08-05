@@ -328,6 +328,10 @@ kbd {
   opacity: 1; box-shadow: 0 0 12px var(--c);
 }
 
+/* Immersive 3D overlay */
+.imm3d { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.imm3d canvas { display: block; }
+
 /* Nav buttons */
 .nav {
   position: absolute; left: 0; right: 0; bottom: 70px;
