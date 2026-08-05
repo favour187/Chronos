@@ -196,7 +196,7 @@ const eras: Era[] = [
 
 function App() {
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [collectedCount, setCollectedCount] = useState(0)
+  const [collectedCount] = useState(0)
   const [visibleEras, setVisibleEras] = useState<Set<string>>(new Set())
   const containerRef = useRef<HTMLDivElement>(null)
 
