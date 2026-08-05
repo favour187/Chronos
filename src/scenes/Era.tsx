@@ -32,7 +32,7 @@ export function Era() {
   }, [era.id, era.accent])
 
   const particleCount = useMemo(() => {
-    if (isMobile) return 150
+    if (isMobile) return 200
     if (quality === 'low') return 250
     if (quality === 'med') return 400
     return 600
@@ -40,6 +40,19 @@ export function Era() {
 
   return (
     <div className="era-wrap" key={era.id}>
+      {/* Mobile: CSS cover image (100% fill, no black edges, Ken Burns) */}
+      {isMobile && (
+        <div
+          className="era-cinematic-bg"
+          style={{
+            backgroundImage: `url(${era.image})`,
+          }}
+        >
+          <div className="era-bg-grade" style={{ background: `linear-gradient(180deg, ${era.sky}cc 0%, ${era.fog}55 50%, ${era.ground}ee 100%)` }} />
+          <div className="era-bg-gold" style={{ background: `radial-gradient(ellipse at 50% 40%, ${era.accent}22 0%, transparent 60%)` }} />
+        </div>
+      )}
+
       <Canvas
         shadows={false}
         dpr={[1, isMobile ? 1.5 : 2]}
@@ -49,45 +62,68 @@ export function Era() {
           near: 0.1,
           far: 1500,
         }}
+        gl={{ alpha: isMobile }}
+        style={{ position: 'absolute', inset: 0 }}
       >
-        <color attach="background" args={[era.sky]} />
-        <fog attach="fog" args={[era.fog, 20, isMobile ? 70 : 90]} />
-        <ambientLight intensity={0.7} color={'#ffffff'} />
-        <directionalLight position={[0, 8, 4]} intensity={0.8} color={'#ffffff'} />
+        {!isMobile && <color attach="background" args={[era.sky]} />}
+        {isMobile && <color attach="background" args={[0x000000]} />}
+        {!isMobile && <fog attach="fog" args={[era.fog, 20, 90]} />}
+        <ambientLight intensity={isMobile ? 0.3 : 0.7} color={'#ffffff'} />
+        <directionalLight position={[0, 8, 4]} intensity={isMobile ? 0.3 : 0.8} color={'#ffffff'} />
         <pointLight position={[0, 2, -6]} intensity={2} color={era.accent} distance={30} />
 
         <Suspense fallback={null}>
-          <EraWorld eraId={era.id} accent={era.accent} />
-          <Particles
-            count={particleCount}
-            color={era.accent}
-            size={0.08}
-            radius={18}
-            shape="dust"
-            speed={0.12}
-          />
-          {!isMobile && <Artifact era={era} position={[0, 1.6, -6]} />}
+          {!isMobile && <EraWorld eraId={era.id} accent={era.accent} />}
+          {isMobile && (
+            // Gold + accent stardust on top of the CSS image
+            <>
+              <Particles count={particleCount} color={era.accent} size={0.12} radius={10} shape="sphere" speed={0.15} />
+              <Particles count={80} color="#ffd700" size={0.18} radius={8} shape="sphere" speed={0.08} />
+              <Particles count={40} color="#ffffff" size={0.08} radius={12} shape="dust" speed={0.05} />
+            </>
+          )}
           {!isMobile && (
-            <Portal
-              position={[0, 2.2, -12]}
-              color={eraIndex < ERAS.length - 1 ? ERAS[eraIndex + 1].accent : '#c470ff'}
-              label={eraIndex < ERAS.length - 1 ? `TRAVEL TO ${ERAS[eraIndex + 1].name.toUpperCase()}` : 'ENTER THE FINALE'}
-              onEnter={nextEra}
-              scale={1.1}
-            />
+            <>
+              <Particles count={particleCount} color={era.accent} size={0.08} radius={18} shape="dust" speed={0.12} />
+              <Artifact era={era} position={[0, 1.6, -6]} />
+              <Portal
+                position={[0, 2.2, -12]}
+                color={eraIndex < ERAS.length - 1 ? ERAS[eraIndex + 1].accent : '#c470ff'}
+                label={eraIndex < ERAS.length - 1 ? `TRAVEL TO ${ERAS[eraIndex + 1].name.toUpperCase()}` : 'ENTER THE FINALE'}
+                onEnter={nextEra}
+                scale={1.1}
+              />
+            </>
           )}
           <Player />
         </Suspense>
 
         <EffectComposer multisampling={0} enableNormalPass={false}>
-          <Bloom intensity={isMobile ? 0.6 : 1.0} luminanceThreshold={0.3} luminanceSmoothing={0.9} mipmapBlur />
-          <Vignette eskil={false} offset={0.25} darkness={isMobile ? 1.0 : 0.9} />
+          <Bloom intensity={isMobile ? 0.8 : 1.0} luminanceThreshold={0.3} luminanceSmoothing={0.9} mipmapBlur />
+          <Vignette eskil={false} offset={0.2} darkness={isMobile ? 1.1 : 0.9} />
         </EffectComposer>
       </Canvas>
+
+      {/* Cinematic letterbox bars for film feel */}
+      <div className="letterbox-top" />
+      <div className="letterbox-bottom" />
+      <div className="film-grain" />
+
       <HUD />
       <FactPanel />
       <InteractionPrompt />
       <MobileControls />
+
+      {/* Cinema-style era title card on mobile */}
+      {isMobile && (
+        <div className="era-title-card" key={era.id}>
+          <div className="etc-line" style={{ background: era.accent }} />
+          <div className="etc-year" style={{ color: era.accent }}>{era.year}</div>
+          <h1 className="etc-name">{era.name}</h1>
+          <div className="etc-sub">{era.subtitle}</div>
+          <div className="etc-tagline">{era.tagline}</div>
+        </div>
+      )}
     </div>
   )
 }
