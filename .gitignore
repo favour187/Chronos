@@ -9,6 +9,7 @@
 *.sln
 *.suo
 *.sw?
+*.tsbuildinfo
 .DS_Store
 .idea
 .vscode/*
