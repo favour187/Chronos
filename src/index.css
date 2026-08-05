@@ -15,7 +15,10 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #root {
-  width: 100%; height: 100%;
+  width: 100%;
+  width: 100dvw;
+  height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: #000;
   color: var(--text);
@@ -26,7 +29,14 @@ html, body, #root {
   user-select: none;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  position: fixed;
+  inset: 0;
 }
+body { margin: 0; padding: 0; }
+img { display: block; max-width: 100%; }
+/* Prevent iOS Safari overscroll/url-bar bounce from revealing seams */
+#root { contain: layout paint size; }
 
 button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 
@@ -197,11 +207,14 @@ kbd {
   background-size: cover;
   background-repeat: no-repeat;
   z-index: 1;
-  animation: kenburns 18s ease-out forwards;
   transform-origin: center center;
+  will-change: transform, opacity, filter;
 }
-.era.dir-next .era-img { animation: slide-in-next 0.9s cubic-bezier(0.16,1,0.3,1) both; }
-.era.dir-prev .era-img { animation: slide-in-prev 0.9s cubic-bezier(0.16,1,0.3,1) both; }
+.era.dir-next .era-img { animation: slide-in-next 0.9s cubic-bezier(0.16,1,0.3,1) both, kenburns 18s ease-out 0.9s forwards; }
+.era.dir-prev .era-img { animation: slide-in-prev 0.9s cubic-bezier(0.16,1,0.3,1) both, kenburns 18s ease-out 0.9s forwards; }
+/* Hide the image briefly before it paints to avoid any flash of empty background */
+.era-img { animation-delay: 0s; }
+.era-img::after { content: ''; position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 .era-grade {
   position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.7) 100%);
@@ -330,7 +343,7 @@ kbd {
 
 /* Immersive 3D overlay */
 .imm3d { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.imm3d canvas { display: block; }
+.imm3d canvas { display: block; width: 100% !important; height: 100% !important; }
 
 /* Nav buttons */
 .nav {
@@ -514,36 +527,67 @@ kbd {
 }
 @keyframes fill { from { width: 0; } to { width: 100%; } }
 
-/* ------------- MOBILE (ios-first) ------------- */
+/* Big, friendly mobile Next button — the primary action on a phone. */
 @media (max-width: 900px) {
   html, body { height: 100dvh; }
-  .hud-top { padding: 14px 14px; }
+  .hud-top { padding: max(14px, env(safe-area-inset-top)) 14px 14px; }
   .hud-era-name { font-size: 0.7rem; letter-spacing: 0.2em; }
   .hud-icon { width: 34px; height: 34px; }
   .nav {
-    bottom: 86px; padding: 0 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    padding: 0 14px;
   }
   .nav-btn {
-    padding: 14px 14px; min-width: 0;
-    font-size: 0; /* hide label on mobile, show only arrow? keep label small */
+    min-height: 52px;
+    min-width: 0;
+    font-size: 0;
+    padding: 0 18px;
+    border-radius: 0;
+  }
+  .nav-btn.next {
+    padding: 0 22px;
+    min-height: 56px;
+    font-size: 0.75rem;
+    letter-spacing: 0.22em;
   }
   .nav-btn .nav-label {
-    font-size: 0.65rem; letter-spacing: 0.15em;
+    font-size: 0.7rem; letter-spacing: 0.2em;
   }
-  .nav-btn.prev { padding: 12px 14px; }
-  .nav-btn.next { padding: 14px 18px; }
-  .hud-progress { bottom: 18px; gap: 6px; padding: 7px 12px; }
+  .nav-arrow { font-size: 1.4rem; }
+  .hud-progress { bottom: calc(16px + env(safe-area-inset-bottom)); gap: 6px; padding: 7px 12px; }
   .dot { width: 6px; height: 6px; }
   .dot.current { width: 18px; }
   .swipe-hint { display: none; }
-  .era-card { width: 86%; }
+  .era-card { width: 88%; padding: 0 8px; }
   .era-sub { margin-bottom: 14px; letter-spacing: 0.25em; }
-  .era-quote { display: none; } /* keep it clean on mobile */
-  .btn-primary { padding: 14px 32px; font-size: 0.8rem; }
+  .era-quote { display: none; }
+  .era-name { font-size: clamp(2.2rem, 11vw, 3.6rem); letter-spacing: 0.03em; }
+  .btn-primary { padding: 16px 34px; font-size: 0.8rem; min-height: 52px; }
   .menu-controls { flex-direction: column; gap: 8px; margin-top: 28px; }
-  .credits-fine { bottom: 20px; font-size: 0.6rem; }
+  .credits-fine { bottom: calc(20px + env(safe-area-inset-bottom)); font-size: 0.6rem; }
+  .finale-hint, .boot-hint { font-size: 0.95rem; }
 }
 @media (max-width: 420px) {
-  .nav-btn .nav-label { display: none; }
-  .nav-btn { padding: 14px; }
+  .nav-btn.prev .nav-label { display: none; }
+  .nav-btn.prev { padding: 14px; min-width: 48px; justify-content: center; }
+  .nav-btn.next .nav-label { display: inline; }
+  .nav-btn.next { padding: 14px 22px; }
 }
+
+/* Add a small "tap to continue" hint for finale */
+.finale-hint {
+  position: absolute; bottom: 22%;
+  font-family: var(--font-mono);
+  font-size: 0.7rem; letter-spacing: 0.35em;
+  color: var(--text-dim);
+  animation: fade-in 2s ease 1.5s both, pulse-soft 2.6s ease-in-out infinite 2s;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Respect safe-area insets for notched phones on top bars */
+.hud-top { padding-top: max(18px, env(safe-area-inset-top)); }
+.hud-logo, .hud-era { position: relative; z-index: 2; }

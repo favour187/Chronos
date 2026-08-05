@@ -12,27 +12,36 @@ export default function App() {
   const [dir, setDir] = useState<1 | -1>(1)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const masterRef = useRef<GainNode | null>(null)
+  const padRef = useRef<{ oscs: OscillatorNode[]; lp: BiquadFilterNode } | null>(null)
   const [muted, setMuted] = useState(false)
 
-  // Preload images
+  // Preload ALL imagery before we let the user in — no pop-in, no seams.
   useEffect(() => {
-    let p = 0
-    const imgs = ERAS.map((e) => {
+    const all = [
+      ...ERAS.map((e) => e.image),
+      '/images/boot-stars.jpg',
+      '/images/menu-clock.jpg',
+      '/images/finale-collapse.jpg',
+      '/images/credits-galaxy.jpg',
+    ]
+    let done = 0
+    let canceled = false
+    const finishOne = () => {
+      done += 1
+      if (canceled) return
+      setLoadPct(done / all.length)
+      if (done >= all.length) {
+        window.setTimeout(() => !canceled && setPhase('menu'), 500)
+      }
+    }
+    const imgs = all.map((src) => {
       const img = new Image()
-      img.src = e.image
+      img.onload = finishOne
+      img.onerror = finishOne // never stall on a missing asset
+      img.src = src
       return img
     })
-    const id = window.setInterval(() => {
-      p += 0.05 + Math.random() * 0.1
-      if (p >= 1) {
-        p = 1
-        window.clearInterval(id)
-        window.setTimeout(() => setPhase('menu'), 500)
-      }
-      setLoadPct(p)
-      void imgs
-    }, 60)
-    return () => window.clearInterval(id)
+    return () => { canceled = true; imgs.forEach((i) => { i.onload = null; i.onerror = null }) }
   }, [])
 
   // Audio setup (single AudioContext, single master gain)
@@ -45,9 +54,43 @@ export default function App() {
       g.connect(c.destination)
       audioCtxRef.current = c
       masterRef.current = g
+
+      // Ambient C-major pad starts ONCE with the context and lives for the
+      // entire session — no pops or rebirths on each era change.
+      const freqs = [110, 164.81, 220]
+      const oscs: OscillatorNode[] = []
+      const lp = c.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 700
+      lp.connect(g)
+      freqs.forEach((f) => {
+        const o = c.createOscillator()
+        o.type = 'sine'
+        o.frequency.value = f
+        const og = c.createGain()
+        og.gain.value = 0.012
+        o.connect(og).connect(lp)
+        o.start()
+        oscs.push(o)
+      })
+      padRef.current = { oscs, lp }
     }
     if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume()
   }, [])
+
+  useEffect(() => {
+    if (masterRef.current && audioCtxRef.current) {
+      masterRef.current.gain.setTargetAtTime(muted ? 0 : 0.25, audioCtxRef.current.currentTime, 0.2)
+    }
+  }, [muted])
+
+  // Softly "brighten" the pad during eras and dim it during menu/credits.
+  useEffect(() => {
+    const p = padRef.current
+    if (!p || !audioCtxRef.current) return
+    const target = phase === 'era' ? 1100 : phase === 'intro' || phase === 'finale' ? 1400 : 600
+    p.lp.frequency.setTargetAtTime(target, audioCtxRef.current.currentTime, 0.8)
+  }, [phase])
 
   const tone = useCallback((f: number, d: number, t: OscillatorType = 'sine', v = 0.15, slide?: number) => {
     if (!audioCtxRef.current || !masterRef.current) return
@@ -56,12 +99,12 @@ export default function App() {
     const g = c.createGain()
     const lp = c.createBiquadFilter()
     lp.type = 'lowpass'
-    lp.frequency.value = 1800
+    lp.frequency.value = 1600
     o.type = t
     o.frequency.setValueAtTime(f, c.currentTime)
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, slide), c.currentTime + d)
     g.gain.setValueAtTime(0.0001, c.currentTime)
-    g.gain.exponentialRampToValueAtTime(v, c.currentTime + 0.04)
+    g.gain.exponentialRampToValueAtTime(v, c.currentTime + 0.05)
     g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + d)
     o.connect(lp).connect(g).connect(masterRef.current)
     o.start()
@@ -69,69 +112,43 @@ export default function App() {
   }, [])
 
   const chime = useCallback(() => {
-    tone(523.25, 1.8, 'sine', 0.07)
-    setTimeout(() => tone(659.25, 2.0, 'sine', 0.05), 160)
-    setTimeout(() => tone(783.99, 2.4, 'sine', 0.04), 320)
+    tone(523.25, 2.2, 'sine', 0.06)
+    setTimeout(() => tone(659.25, 2.3, 'sine', 0.045), 170)
+    setTimeout(() => tone(783.99, 2.6, 'sine', 0.035), 340)
   }, [tone])
 
   const whoosh = useCallback(() => {
     if (!audioCtxRef.current || !masterRef.current) return
     const c = audioCtxRef.current
-    const dur = 0.7
-    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate)
+    const dur = 0.65
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate)
     const d = buf.getChannelData(0)
     for (let i = 0; i < d.length; i++) {
       const t = i / d.length
-      d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * t)
+      d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * t) * (1 - t * 0.5)
     }
     const s = c.createBufferSource()
     s.buffer = buf
     const bp = c.createBiquadFilter()
     bp.type = 'bandpass'
-    bp.frequency.value = 500
+    bp.frequency.value = 480
+    bp.Q.value = 0.9
     const g = c.createGain()
-    g.gain.value = 0.12
+    g.gain.value = 0.09
     s.connect(bp).connect(g).connect(masterRef.current)
     s.start()
   }, [])
 
   const warp = useCallback(() => {
-    tone(100, 1.0, 'sine', 0.08, 500)
+    tone(90, 0.9, 'sine', 0.07, 460)
     whoosh()
   }, [tone, whoosh])
-
-  useEffect(() => {
-    if (masterRef.current) {
-      masterRef.current.gain.setTargetAtTime(muted ? 0 : 0.25, audioCtxRef.current?.currentTime ?? 0, 0.2)
-    }
-  }, [muted])
-
-  // Ambient hum — one detuned pair of oscillators, started once
-  useEffect(() => {
-    if (!audioCtxRef.current || !masterRef.current) return
-    const c = audioCtxRef.current
-    const freqs = [110, 164.81, 220]
-    const oscs: OscillatorNode[] = []
-    freqs.forEach((f) => {
-      const o = c.createOscillator()
-      o.type = 'sine'
-      o.frequency.value = f
-      const g = c.createGain()
-      g.gain.value = 0.015
-      const lp = c.createBiquadFilter()
-      lp.type = 'lowpass'
-      lp.frequency.value = 800
-      o.connect(lp).connect(g).connect(masterRef.current!)
-      o.start()
-      oscs.push(o)
-    })
-    return () => oscs.forEach((o) => { try { o.stop() } catch { /* noop */ } })
-  }, [phase === 'era' && eraIdx])
 
   // Auto-advance intro stages
   const [introStage, setIntroStage] = useState(0)
   useEffect(() => {
     if (phase !== 'intro') return
+    const delay = [800, 1500, 1500, 1100][introStage]
     const id = window.setTimeout(() => {
       if (introStage < 3) {
         setIntroStage(introStage + 1)
@@ -141,20 +158,24 @@ export default function App() {
         setPhase('era')
         setEraIdx(0)
       }
-    }, [900, 1600, 1800, 1200][introStage])
+    }, delay)
     return () => window.clearTimeout(id)
   }, [phase, introStage, chime, warp])
+
+  // When leaving intro, reset stage so a replay works.
+  useEffect(() => {
+    if (phase !== 'intro') setIntroStage(0)
+  }, [phase])
 
   const next = useCallback(() => {
     ensureAudio()
     warp()
     setDir(1)
-    if (eraIdx >= ERAS.length - 1) {
-      setPhase('finale')
-    } else {
-      setEraIdx((i) => i + 1)
-    }
-  }, [eraIdx, ensureAudio, warp])
+    if (phase === 'menu') { setPhase('intro'); return }
+    if (phase === 'credits') { setPhase('menu'); setEraIdx(0); return }
+    if (eraIdx >= ERAS.length - 1) { setPhase('finale'); return }
+    setEraIdx((i) => i + 1)
+  }, [phase, eraIdx, ensureAudio, warp])
 
   const prev = useCallback(() => {
     ensureAudio()
@@ -168,10 +189,9 @@ export default function App() {
     chime()
     whoosh()
     setPhase('intro')
-    setIntroStage(0)
   }, [ensureAudio, chime, whoosh])
 
-  // Touch swipe
+  // Touch swipe — works from any phase.
   useEffect(() => {
     let sx = 0, sy = 0, t = 0
     const ts = (e: TouchEvent) => { if (e.touches.length !== 1) return; sx = e.touches[0].clientX; sy = e.touches[0].clientY; t = performance.now() }
@@ -180,8 +200,14 @@ export default function App() {
       const dy = e.changedTouches[0].clientY - sy
       const dt = performance.now() - t
       if (dt > 600 || Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 50) return
-      if (dx < 0) { if (phase === 'menu') begin(); else if (phase === 'era') next(); else if (phase === 'finale') setPhase('credits'); }
-      else { if (phase === 'era') prev() }
+      if (dx < 0) {
+        if (phase === 'menu') begin()
+        else if (phase === 'era') next()
+        else if (phase === 'finale') setPhase('credits')
+        else if (phase === 'credits') { setPhase('menu'); setEraIdx(0) }
+      } else {
+        if (phase === 'era') prev()
+      }
     }
     window.addEventListener('touchstart', ts, { passive: true })
     window.addEventListener('touchend', te, { passive: true })
@@ -191,21 +217,19 @@ export default function App() {
   // Keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'ArrowRight' || e.code === 'Space') { e.preventDefault(); if (phase === 'menu') begin(); else if (phase === 'era') next(); else if (phase === 'finale') setPhase('credits'); }
+      if (e.code === 'ArrowRight' || e.code === 'Space') {
+        e.preventDefault()
+        if (phase === 'menu') begin()
+        else if (phase === 'era') next()
+        else if (phase === 'finale') setPhase('credits')
+        else if (phase === 'credits') { setPhase('menu'); setEraIdx(0) }
+      }
       if (e.code === 'ArrowLeft') { e.preventDefault(); if (phase === 'era') prev() }
       if (e.code === 'KeyM') setMuted((m) => !m)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [phase, next, prev, begin])
-
-  // Preload next/prev image for snappy transitions
-  useEffect(() => {
-    const nextImg = ERAS[Math.min(ERAS.length - 1, eraIdx + 1)]
-    if (nextImg) { const i = new Image(); i.src = nextImg.image }
-    const prevImg = ERAS[Math.max(0, eraIdx - 1)]
-    if (prevImg) { const i = new Image(); i.src = prevImg.image }
-  }, [eraIdx])
 
   // Finale auto-advance
   useEffect(() => {
@@ -214,11 +238,34 @@ export default function App() {
     return () => window.clearTimeout(id)
   }, [phase])
 
+  // Tap-to-advance on the backdrop (mobile-friendly big hit target)
+  const onStageTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignore clicks that originated from buttons or on the left half (back).
+    const tgt = e.target as HTMLElement
+    if (tgt.closest('button')) return
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const isBack = x < rect.width * 0.28 && phase === 'era' && eraIdx > 0
+    if (isBack) prev()
+    else next()
+  }, [phase, eraIdx, next, prev])
+
   const era = ERAS[eraIdx]
 
   return (
-    <div className="app" data-phase={phase}>
-      <Starfield density={phase === 'boot' || phase === 'menu' ? 220 : 80} />
+    <div className="app" data-phase={phase} onClick={onStageTap}>
+      <Starfield density={phase === 'boot' || phase === 'menu' ? 220 : 70} />
+
+      {/* The 3D layer is mounted ONCE and lives under every phase that wants
+          immersion — moving it outside per-era blocks prevents WebGL rebuilds
+          (no hitches, no flashes). We hide it during boot/menu. */}
+      {phase !== 'boot' && (
+        <ImmersiveLayer
+          accent={phase === 'era' ? era.accent : phase === 'finale' ? '#c470ff' : phase === 'credits' ? '#ffd700' : '#00d4ff'}
+          artifactEmoji=""
+          eraIndex={eraIdx}
+        />
+      )}
 
       {phase === 'boot' && (
         <div className="boot">
@@ -245,7 +292,7 @@ export default function App() {
             <div className="menu-controls">
               <span><kbd>←</kbd><kbd>→</kbd> navigate</span>
               <span><kbd>M</kbd> mute</span>
-              <span><kbd>tap</kbd> on mobile</span>
+              <span>tap or swipe on mobile</span>
             </div>
           </div>
         </div>
@@ -253,7 +300,7 @@ export default function App() {
 
       {phase === 'intro' && (
         <div className="intro">
-          <div className={`intro-stage s${introStage}`}>
+          <div className={`intro-stage s${introStage}`} key={introStage}>
             {introStage === 0 && <div className="intro-text">IN THE DARKNESS…</div>}
             {introStage === 1 && <div className="intro-text glow-gold">A clock forms from stardust.</div>}
             {introStage === 2 && <div className="intro-text glitch">TIME SHATTERS</div>}
@@ -266,13 +313,12 @@ export default function App() {
         <div className={`era dir-${dir === 1 ? 'next' : 'prev'}`} key={era.id}>
           <div
             className="era-img"
-            style={{ backgroundImage: `url(${era.image})`, ['--accent' as string]: era.accent }}
+            style={{ backgroundImage: `url(${era.image})`, ['--accent' as string]: era.accent } as React.CSSProperties}
           >
             <div className="era-grade" />
             <div className="era-gold" />
             <div className="era-vignette" />
           </div>
-          <ImmersiveLayer accent={era.accent} artifactEmoji={era.quote} eraIndex={eraIdx} />
 
           <header className="hud-top">
             <div className="hud-logo">CHRONOS</div>
@@ -280,7 +326,7 @@ export default function App() {
               <span className="hud-dot" style={{ background: era.accent, boxShadow: `0 0 12px ${era.accent}` }} />
               <span className="hud-era-name">{era.name}</span>
             </div>
-            <button className="hud-icon" onClick={() => setMuted((m) => !m)} aria-label="mute">{muted ? '🔇' : '🔊'}</button>
+            <button className="hud-icon" onClick={(e) => { e.stopPropagation(); setMuted((m) => !m) }} aria-label="mute">{muted ? '🔇' : '🔊'}</button>
           </header>
 
           <div className="era-card">
@@ -294,18 +340,22 @@ export default function App() {
 
           <div className="hud-progress">
             {ERAS.map((e, i) => (
-              <span key={e.id} className={`dot ${i === eraIdx ? 'current' : ''} ${i < eraIdx ? 'done' : ''}`} style={{ ['--c' as string]: e.accent, background: i <= eraIdx ? e.accent : 'transparent', borderColor: e.accent }} />
+              <span
+                key={e.id}
+                className={`dot ${i === eraIdx ? 'current' : ''} ${i < eraIdx ? 'done' : ''}`}
+                style={{ ['--c' as string]: e.accent, background: i <= eraIdx ? e.accent : 'transparent', borderColor: e.accent } as React.CSSProperties}
+              />
             ))}
           </div>
 
           <div className="nav">
             {eraIdx > 0 && (
-              <button className="nav-btn prev" onClick={prev} aria-label="previous">
+              <button className="nav-btn prev" onClick={(e) => { e.stopPropagation(); prev() }} aria-label="previous">
                 <span className="nav-arrow">◂</span>
                 <span className="nav-label">{ERAS[eraIdx - 1].name}</span>
               </button>
             )}
-            <button className="nav-btn next" onClick={next} aria-label="next">
+            <button className="nav-btn next" onClick={(e) => { e.stopPropagation(); next() }} aria-label="next">
               <span className="nav-label">
                 {eraIdx < ERAS.length - 1 ? ERAS[eraIdx + 1].name : 'THE FINALE'}
               </span>
@@ -313,7 +363,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="swipe-hint">← swipe or tap →</div>
+          <div className="swipe-hint">← swipe · tap →</div>
         </div>
       )}
 
@@ -326,6 +376,7 @@ export default function App() {
             <div className="finale-kicker">TIMELINE RESTORED</div>
             <h1 className="finale-title">All moments<br />become one.</h1>
             <div className="finale-bar"><div className="finale-fill" /></div>
+            <div className="finale-hint">tap to continue</div>
           </div>
         </div>
       )}
@@ -339,7 +390,7 @@ export default function App() {
             <div className="credits-line" />
             <p className="credits-quote">“The future is created by those<br />who understand the past.”</p>
             <div className="credits-thanks">Thank you for traveling through time.</div>
-            <button className="btn-primary" onClick={() => { setPhase('menu'); setEraIdx(0) }}>↻ JOURNEY AGAIN</button>
+            <button className="btn-primary" onClick={(e) => { e.stopPropagation(); setPhase('menu'); setEraIdx(0) }}>↻ JOURNEY AGAIN</button>
             <div className="credits-fine">CHRONOS · The Living Timeline</div>
           </div>
         </div>

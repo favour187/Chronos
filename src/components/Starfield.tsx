@@ -2,7 +2,10 @@ import { useEffect, useRef } from 'react'
 
 interface Props { density?: number }
 
-/** Lightweight 2D canvas starfield — zero GPU cost, perfect 60fps on phones. */
+/**
+ * Ultra-light 2D canvas starfield — zero GPU cost, 60fps safe on phones.
+ * Drifts slowly leftward with a gentle twinkle. No per-frame allocations.
+ */
 export function Starfield({ density = 200 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -11,12 +14,13 @@ export function Starfield({ density = 200 }: Props) {
     if (!canvas) return
     const ctx = canvas.getContext('2d', { alpha: true })
     if (!ctx) return
-    let w = 0, h = 0, raf = 0, t0 = performance.now()
-    const stars: { x: number; y: number; z: number; r: number; a: number }[] = []
+    let w = 0, h = 0, raf = 0
+    const stars: { x: number; y: number; z: number; r: number; a: number; p: number }[] = []
+
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      w = canvas.width = window.innerWidth * dpr
-      h = canvas.height = window.innerHeight * dpr
+      w = canvas.width = Math.floor(window.innerWidth * dpr)
+      h = canvas.height = Math.floor(window.innerHeight * dpr)
       canvas.style.width = window.innerWidth + 'px'
       canvas.style.height = window.innerHeight + 'px'
       ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -26,24 +30,28 @@ export function Starfield({ density = 200 }: Props) {
           x: Math.random() * w,
           y: Math.random() * h,
           z: Math.random() * 0.8 + 0.2,
-          r: (Math.random() * 1.4 + 0.3) * dpr,
-          a: Math.random() * 0.7 + 0.2,
+          r: (Math.random() * 1.2 + 0.3) * dpr,
+          a: Math.random() * 0.7 + 0.25,
+          p: Math.random() * Math.PI * 2,
         })
       }
     }
     resize()
     window.addEventListener('resize', resize)
 
+    let last = performance.now()
     const draw = (t: number) => {
-      const dt = (t - t0) / 1000
-      t0 = t
+      const dt = Math.min(0.05, (t - last) / 1000)
+      last = t
       ctx.clearRect(0, 0, w, h)
-      for (const s of stars) {
-        s.x -= s.z * 6 * dt * (window.innerWidth < 900 ? 0.4 : 1)
-        if (s.x < 0) s.x = w
-        const tw = 0.6 + Math.sin(t * 0.001 * s.z + s.x) * 0.4
+      const speed = (window.innerWidth < 900 ? 28 : 60) // px/s at dpr=1, scaled below
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i]
+        s.x -= s.z * speed * dt * (window.devicePixelRatio || 1)
+        if (s.x < -2) s.x = w + 2
+        const tw = 0.7 + Math.sin(t * 0.002 * s.z + s.p) * 0.3
+        ctx.fillStyle = `rgba(255,236,205,${(s.a * tw).toFixed(3)})`
         ctx.beginPath()
-        ctx.fillStyle = `rgba(255, ${220 + Math.floor(Math.random() * 5)}, ${180 + Math.floor(Math.random() * 40)}, ${s.a * tw})`
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
         ctx.fill()
       }
