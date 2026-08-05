@@ -12,6 +12,7 @@ import { sfx } from '../audio/engine'
 import { HUD } from '../components/ui/HUD'
 import { FactPanel } from '../components/ui/FactPanel'
 import { InteractionPrompt } from '../components/ui/InteractionPrompt'
+import { MobileControls } from '../components/ui/MobileControls'
 
 export function Era() {
   const eraIndex = useGame((s) => s.currentEraIndex)
@@ -34,9 +35,9 @@ export function Era() {
   return (
     <div className="era-wrap" key={era.id}>
       <Canvas
-        shadows={quality !== 'low'}
-        dpr={quality === 'low' ? [1, 1.25] : [1, 2]}
-        camera={{ position: [0, 2.5, 10], fov: 65, near: 0.1, far: 2000 }}
+        shadows={false}
+        dpr={[1, isMobile ? 1.5 : 2]}
+        camera={{ position: [0, isMobile ? 2.2 : 2.5, isMobile ? 9 : 10], fov: isMobile ? 62 : 65, near: 0.1, far: 2000 }}
       >
         <color attach="background" args={[era.sky]} />
         <fog attach="fog" args={[era.fog, 20, 90]} />
@@ -81,6 +82,12 @@ export function Era() {
       <HUD />
       <FactPanel />
       <InteractionPrompt />
+      <MobileControls />
     </div>
   )
 }
+
+const isMobile =
+  typeof window !== 'undefined' &&
+  (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+    window.matchMedia('(max-width: 900px)').matches)

@@ -6,6 +6,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ImageBackdrop } from '../components/scene/ImageBackdrop'
 import { Particles } from '../components/scene/Particles'
+import { ERAS } from '../eras/data'
 
 interface Props {
   eraId: string
@@ -13,41 +14,25 @@ interface Props {
 }
 
 export function EraWorld({ eraId, accent }: Props) {
+  const era = ERAS.find((e) => e.id === eraId)
+  const img = era?.image ?? `/images/${eraId}.jpg`
   return (
     <group>
-      <ImageBackdrop src={`/images/${eraId}.jpg`} darkness={0.15} tint={accentTint(eraId)} parallax={0.4} drift={0.005} />
+      <ImageBackdrop src={img} darkness={0.05} tint="#ffffff" parallax={0.15} drift={0.002} />
       <GroundFog accent={accent} />
       <EraAccents eraId={eraId} accent={accent} />
     </group>
   )
 }
 
-function accentTint(eraId: string): string {
-  // warm/cool tint per era to keep art feeling integrated with lighting
-  switch (eraId) {
-    case 'birth-of-earth': return '#ff6a2a'
-    case 'dinosaur-age': return '#66d870'
-    case 'early-humans': return '#ffb066'
-    case 'ancient-egypt': return '#ffd54a'
-    case 'ancient-greece': return '#a6c0ff'
-    case 'roman-empire': return '#d66060'
-    case 'medieval': return '#d4b888'
-    case 'renaissance': return '#e6a366'
-    case 'industrial': return '#b8c8cc'
-    case 'digital': return '#5cffb0'
-    case 'future': return '#8ff0ff'
-    case 'cosmic': return '#c490ff'
-    default: return '#ffffff'
-  }
-}
 
-/* A flat glowing ground plane that catches the image palette without fighting it */
+/* A soft dark vignette ground plane */
 function GroundFog({ accent }: { accent: string }) {
   const ref = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     if (!ref.current) return
     const m = ref.current.material as THREE.MeshBasicMaterial
-    m.opacity = 0.65 + Math.sin(clock.elapsedTime * 0.8) * 0.08
+    m.opacity = 0.45 + Math.sin(clock.elapsedTime * 0.8) * 0.05
   })
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} renderOrder={-100}>
@@ -72,7 +57,7 @@ function EraAccents({ eraId, accent }: { eraId: string; accent: string }) {
         <>
           <FloatingRock color="#ff5a1f" position={[-6, 3, -8]} speed={0.3} />
           <FloatingRock color="#ffb347" position={[5, 4, -10]} speed={-0.25} size={1.2} />
-          <Particles count={600} color="#ff6a00" size={0.1} radius={14} shape="dust" speed={0.6} />
+          <Particles count={200} color="#ff6a00" size={0.12} radius={14} shape="dust" speed={0.4} />
           <Lightning />
         </>
       )

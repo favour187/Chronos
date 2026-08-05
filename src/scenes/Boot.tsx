@@ -60,14 +60,14 @@ export function Boot() {
 }
 
 function BootBackdrop() {
-  const tex = useLoader(THREE.TextureLoader, '/images/hero.jpg')
+  const tex = useLoader(THREE.TextureLoader, '/images/boot-stars.jpg')
   useEffect(() => {
     if (tex) tex.colorSpace = THREE.SRGBColorSpace
   }, [tex])
   return (
     <mesh scale={[600, 600, 600]} renderOrder={-1000}>
       <sphereGeometry args={[1, 64, 32]} />
-      <meshBasicMaterial map={tex} side={THREE.BackSide} depthWrite={false} transparent opacity={0.35} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} depthWrite={false} transparent opacity={0.85} />
     </mesh>
   )
 }
