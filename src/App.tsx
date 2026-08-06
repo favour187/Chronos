@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ERAS } from './data'
 import { Starfield } from './components/Starfield'
+import { Safe3D } from './components/Safe3D'
 import { ImmersiveLayer } from './three/ImmersiveLayer'
 
 type Phase = 'boot' | 'menu' | 'intro' | 'era' | 'finale' | 'credits'
@@ -15,12 +16,18 @@ export default function App() {
   const padRef = useRef<{ oscs: OscillatorNode[]; lp: BiquadFilterNode } | null>(null)
   const [muted, setMuted] = useState(false)
 
-  // Preload ALL imagery before we let the user in — no pop-in, no seams.
+  // Gate the menu on ONLY the first-seen images, then warm the rest in the
+  // background. Holding the boot screen hostage to ~4MB of JPEG preloads is
+  // what made mobile feel frozen for seconds — now the user is in after
+  // ~600KB, and later eras stream in while they read the menu and intro.
   useEffect(() => {
-    const all = [
-      ...ERAS.map((e) => e.image),
+    const critical = [
       '/images/boot-stars.jpg',
       '/images/menu-clock.jpg',
+      ERAS[0].image,
+    ]
+    const later = [
+      ...ERAS.slice(1).map((e) => e.image),
       '/images/finale-collapse.jpg',
       '/images/credits-galaxy.jpg',
     ]
@@ -29,19 +36,25 @@ export default function App() {
     const finishOne = () => {
       done += 1
       if (canceled) return
-      setLoadPct(done / all.length)
-      if (done >= all.length) {
-        window.setTimeout(() => !canceled && setPhase('menu'), 500)
+      setLoadPct(done / critical.length)
+      if (done >= critical.length) {
+        window.setTimeout(() => !canceled && setPhase('menu'), 400)
       }
     }
-    const imgs = all.map((src) => {
+    const imgs = critical.map((src) => {
       const img = new Image()
       img.onload = finishOne
       img.onerror = finishOne // never stall on a missing asset
       img.src = src
       return img
     })
-    return () => { canceled = true; imgs.forEach((i) => { i.onload = null; i.onerror = null }) }
+    // Background warm-up: no phase logic, browser cache does the rest.
+    const warm = later.map((src) => { const img = new Image(); img.src = src; return img })
+    return () => {
+      canceled = true
+      imgs.forEach((i) => { i.onload = null; i.onerror = null })
+      warm.forEach((i) => { i.onload = null; i.onerror = null })
+    }
   }, [])
 
   // Audio setup (single AudioContext, single master gain)
@@ -260,11 +273,13 @@ export default function App() {
           immersion — moving it outside per-era blocks prevents WebGL rebuilds
           (no hitches, no flashes). We hide it during boot/menu. */}
       {phase !== 'boot' && (
-        <ImmersiveLayer
-          accent={phase === 'era' ? era.accent : phase === 'finale' ? '#c470ff' : phase === 'credits' ? '#ffd700' : '#00d4ff'}
-          artifactEmoji=""
-          eraIndex={eraIdx}
-        />
+        <Safe3D>
+          <ImmersiveLayer
+            accent={phase === 'era' ? era.accent : phase === 'finale' ? '#c470ff' : phase === 'credits' ? '#ffd700' : '#00d4ff'}
+            artifactEmoji=""
+            eraIndex={eraIdx}
+          />
+        </Safe3D>
       )}
 
       {phase === 'boot' && (

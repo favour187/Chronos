@@ -215,8 +215,13 @@ kbd {
 }
 
 /* ------------- ERA (the screen) ------------- */
+/* No z-index here on purpose: with z-index auto, .era does NOT create its own
+   stacking context, so the children's z-indexes interleave with the 3D layer
+   (.imm3d z-3) in the root context — backdrop (z-1) below, 3D artifacts in
+   the middle, UI text/HUD (z-7..9) on top. Giving .era a z-index trapped the
+   opaque fullscreen image ABOVE the canvas and made all 3D content invisible. */
 .era {
-  position: absolute; inset: 0; z-index: 5;
+  position: absolute; inset: 0;
 }
 .era-img {
   position: absolute; inset: 0;

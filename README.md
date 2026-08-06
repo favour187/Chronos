@@ -3,7 +3,7 @@
 **An immersive 3D cinematic journey through 13.8 billion years of history.**
 *Submission for the 3D Websites Hackathon (Devpost).*
 
-![CHRONOS](public/images/hero.jpg)
+![CHRONOS](public/images/menu-clock.jpg)
 
 > *"The future is created by those who understand the past."*
 
