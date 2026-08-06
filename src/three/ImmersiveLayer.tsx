@@ -1,23 +1,31 @@
 // Ultra-light 3D overlay: a DIFFERENT artifact per era, portal ring, stardust,
-// gold dust — plus mouse/gyro parallax and a warp-pulse on every era change.
-// Camera-driven, no shadows, no postprocessing: stays 60fps on phones.
+// gold dust — plus mouse/gyro parallax, a GLSL "time-tear" transition between
+// eras, and a cinematic bloom/vignette lens. Camera-driven: 60fps on phones.
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { ScreenQuad } from '@react-three/drei'
+import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing'
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
-
-interface Props {
-  accent: string
-  artifactEmoji: string
-  eraIndex: number
-}
+import { ERAS } from '../data'
 
 /* ---------- shared imperative state (one canvas, so module singletons) ---------- */
 
 // Pointer / gyro target in normalized device coords (-1..1)
 const inputTarget = { x: 0, y: 0 }
 // Warp pulse: 1 right after an era change, decays to 0. Drives camera dolly,
-// artifact pop and emissive flash.
+// artifact pop, star-streaks and the time-tear transition.
 const warpPulse = { v: 0 }
+
+// Cinematic post lens: desktop only (phones keep raw canvas for guaranteed fps).
+const CINE_LENS =
+  typeof window !== 'undefined' &&
+  window.matchMedia('(min-width: 900px) and (pointer: fine)').matches
+
+interface Props {
+  accent: string
+  artifactEmoji: string
+  eraIndex: number
+}
 
 // Shared target accent color (hex string) that scene elements lerp toward.
 function useAccentTarget(hex: string) {
@@ -40,11 +48,19 @@ export function ImmersiveLayer({ accent, eraIndex }: Props) {
         <pointLight position={[-3, -1, 3]} intensity={0.9} color="#ffd700" distance={10} />
         <InputListener />
         <CameraRig eraIndex={eraIndex} />
+        <TimeTear eraIndex={eraIndex} />
         <Stars targetRef={targetRef} />
         <EraArtifact key={eraIndex} eraIndex={eraIndex} targetRef={targetRef} />
         <PortalRing targetRef={targetRef} />
         <GoldDust />
         <AccentSync hex={accent} targetRef={targetRef} />
+        {CINE_LENS && (
+          <EffectComposer multisampling={0}>
+            <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.5} luminanceSmoothing={0.25} radius={0.72} />
+            <Noise opacity={0.05} />
+            <Vignette offset={0.22} darkness={0.5} eskil={false} />
+          </EffectComposer>
+        )}
       </Canvas>
     </div>
   )
@@ -90,6 +106,10 @@ function CameraRig({ eraIndex }: { eraIndex: number }) {
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, inputTarget.x * 0.85, k)
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, inputTarget.y * 0.5, k)
     camera.position.z = 7 + warpPulse.v * 2.4
+    // Hitchcock dolly-zoom: the lens counter-zooms as we dive through time
+    const pc = camera as THREE.PerspectiveCamera
+    pc.fov = 55 - warpPulse.v * 9
+    pc.updateProjectionMatrix()
     camera.lookAt(0, 0, -2)
   })
   return null
@@ -111,6 +131,166 @@ function AccentLights({ targetRef }: { targetRef: MutableRefObject<THREE.Color> 
     light1.current.color.copy(cur)
   })
   return <pointLight ref={light1} position={[0, 2, 5]} intensity={2.4} distance={12} />
+}
+
+/* ---------- "time-tear": a GLSL reality-rip between eras ---------- */
+// The old era tears open along a molten gold seam and the new era floods in
+// through the wound. Sits above the CSS backdrop during the warp pulse only;
+// instant swap stays as the fallback when textures aren't ready.
+
+const TEAR_VERT = /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = position.xy * 0.5 + 0.5;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`
+
+const TEAR_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tex1;
+uniform sampler2D tex2;
+uniform float progress;   // 0 = old era, 1 = new era
+uniform float time;
+uniform float aspect1;
+uniform float aspect2;
+uniform float screenAspect;
+
+// simplex noise (Ashima, 2D)
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+float snoise(vec2 v) {
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy));
+  vec2 x0 = v - i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+  m = m*m; m = m*m;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+  vec3 g;
+  g.x = a0.x * x0.x + h.x * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+// CSS "cover" fit for arbitrary image/screen aspect
+vec2 cover(vec2 uv, float imgAspect, float scrAspect) {
+  vec2 st = uv - 0.5;
+  float r = scrAspect / imgAspect;
+  if (r < 1.0) st.x *= r; else st.y /= r;
+  return st + 0.5;
+}
+
+void main() {
+  float p = smoothstep(0.0, 1.0, progress);
+  float n = snoise(vUv * vec2(3.0, 5.0) + time * 0.25);
+  // tear front sweeps diagonally with a noisy, electric edge
+  float front = vUv.x * 0.85 + (1.0 - vUv.y) * 0.15;
+  float field = front + n * 0.18;
+  float width = mix(0.02, 0.35, sin(p * 3.14159)); // seam opens then seals
+  float mask = smoothstep(p * 1.3 - width, p * 1.3, field);
+
+  // the wound displaces both worlds around the seam
+  float wound = 1.0 - smoothstep(0.0, width * 1.6, abs(field - p * 1.3));
+  vec2 pull = vec2(0.0, wound * 0.12 * sin(p * 3.14159));
+
+  vec2 uv1 = cover(vUv, aspect1, screenAspect);
+  vec2 uv2 = cover(vUv, aspect2, screenAspect);
+  vec3 c1 = texture2D(tex1, uv1 + pull).rgb;
+  vec3 c2 = texture2D(tex2, uv2 - pull).rgb;
+  vec3 col = mix(c2, c1, mask);
+
+  // molten gold light inside the tear
+  vec3 gold = vec3(1.0, 0.78, 0.32);
+  col += gold * wound * 1.6 * sin(p * 3.14159);
+  col += gold * n * wound * 0.5;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`
+
+function TimeTear({ eraIndex }: { eraIndex: number }) {
+  const { size } = useThree()
+  const meshRef = useRef<THREE.Mesh>(null)
+  const matRef = useRef<THREE.ShaderMaterial>(null)
+  const texRef = useRef<(THREE.Texture | null)[]>([])
+  const tr = useRef<{ from: number; to: number } | null>(null)
+  const last = useRef(eraIndex)
+
+  const uniforms = useMemo(
+    () => ({
+      tex1: { value: null as THREE.Texture | null },
+      tex2: { value: null as THREE.Texture | null },
+      progress: { value: 1 },
+      time: { value: 0 },
+      aspect1: { value: 1 },
+      aspect2: { value: 1 },
+      screenAspect: { value: 1 },
+    }),
+    [],
+  )
+
+  // Warm the texture cache in the background; images are already cached by
+  // the boot preloader, so decoding is cheap.
+  useEffect(() => {
+    let alive = true
+    const loader = new THREE.TextureLoader()
+    ERAS.forEach((e, i) => {
+      loader.load(e.image, (t) => {
+        if (!alive) { t.dispose(); return }
+        t.colorSpace = THREE.SRGBColorSpace
+        texRef.current[i] = t
+      })
+    })
+    return () => { alive = false }
+  }, [])
+
+  useFrame(({ clock }) => {
+    if (last.current !== eraIndex) {
+      tr.current = { from: last.current, to: eraIndex }
+      last.current = eraIndex
+    }
+    const t = tr.current
+    const mesh = meshRef.current
+    const mat = matRef.current
+    if (!mesh || !mat || !t) return
+    const texA = texRef.current[t.from]
+    const texB = texRef.current[t.to]
+    const active = warpPulse.v > 0.02 && !!texA && !!texB
+    mesh.visible = active
+    if (!active) return
+    mat.uniforms.tex1.value = texA
+    mat.uniforms.tex2.value = texB
+    mat.uniforms.aspect1.value = (texA!.image.width as number) / (texA!.image.height as number)
+    mat.uniforms.aspect2.value = (texB!.image.width as number) / (texB!.image.height as number)
+    mat.uniforms.screenAspect.value = size.width / size.height
+    mat.uniforms.progress.value = 1 - warpPulse.v
+    mat.uniforms.time.value = clock.getElapsedTime()
+  })
+
+  return (
+    <ScreenQuad ref={meshRef} visible={false} renderOrder={999} frustumCulled={false}>
+      <shaderMaterial
+        ref={matRef}
+        args={[{
+          uniforms,
+          vertexShader: TEAR_VERT,
+          fragmentShader: TEAR_FRAG,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+        }]}
+      />
+    </ScreenQuad>
+  )
 }
 
 /* ---------- the star of the show: a bespoke artifact per era ---------- */
