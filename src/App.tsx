@@ -201,8 +201,20 @@ export default function App() {
     ensureAudio()
     chime()
     whoosh()
+    // iOS 13+ requires a user gesture to enable gyroscope parallax.
+    const doe = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
+    if (typeof doe?.requestPermission === 'function') doe.requestPermission().catch(() => {})
     setPhase('intro')
   }, [ensureAudio, chime, whoosh])
+
+  // Jump straight to any era from the progress rail.
+  const jump = useCallback((i: number) => {
+    if (i === eraIdx) return
+    ensureAudio()
+    warp()
+    setDir(i > eraIdx ? 1 : -1)
+    setEraIdx(i)
+  }, [eraIdx, ensureAudio, warp])
 
   // Touch swipe — works from any phase.
   useEffect(() => {
@@ -354,10 +366,14 @@ export default function App() {
           </div>
 
           <div className="hud-progress">
+            <span className="hud-count">{String(eraIdx + 1).padStart(2, '0')} / {ERAS.length}</span>
             {ERAS.map((e, i) => (
-              <span
+              <button
                 key={e.id}
                 className={`dot ${i === eraIdx ? 'current' : ''} ${i < eraIdx ? 'done' : ''}`}
+                onClick={(ev) => { ev.stopPropagation(); jump(i) }}
+                aria-label={`Jump to ${e.name}`}
+                title={e.name}
                 style={{ ['--c' as string]: e.accent, background: i <= eraIdx ? e.accent : 'transparent', borderColor: e.accent } as React.CSSProperties}
               />
             ))}

@@ -356,12 +356,22 @@ kbd {
   border: 1px solid;
   transition: all 0.4s ease;
   opacity: 0.4;
+  cursor: pointer;
 }
+.dot:hover { transform: scale(1.5); opacity: 1; }
 .dot.done { opacity: 0.8; }
 .dot.current {
   width: 24px; border-radius: 4px;
   opacity: 1; box-shadow: 0 0 12px var(--c);
 }
+.hud-count {
+  font-family: var(--font-mono);
+  font-size: 0.62rem; letter-spacing: 0.2em;
+  color: var(--text-dim);
+  margin-right: 6px;
+  align-self: center;
+}
+.hud-progress { align-items: center; }
 
 /* Immersive 3D overlay */
 .imm3d { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
