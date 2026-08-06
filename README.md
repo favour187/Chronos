@@ -17,8 +17,11 @@ CHRONOS is a mobile-first cinematic web experience that takes you from the fiery
   - Full-bleed AI-generated backdrop (Ken Burns slow zoom)
   - Era-tinted color grade + gold radial halo + vignette
   - Cinema title card: mono year stamp, Cinzel Decorative title, subtitle, italic tagline
-  - 3D artifact crystal (spinning octahedron + orbiting ring, glow)
+  - **A unique real-time 3D artifact per era** — molten planetoid, fossil shard, flint, pyramid, Platonic solid, column, stone block, torus-knot, gear, network mesh, hyperloop knot, star-orb
   - 3D portal ring and additively-blended star particles
+- ⚡ **"Time-tear" GLSL transitions** — the old era rips open along a molten gold seam (custom shader) as the new one floods in
+- 🎥 **Cinematic lens** — bloom, film grain and vignette post-processing on desktop; Hitchcock dolly-zoom on every warp
+- 🖱 **Pointer + gyroscope parallax** — the camera leans with your mouse or the tilt of your phone
 - ➡️ **Prev / Next navigation** (buttons, arrow keys, swipe, tap on mobile)
 - 🎯 **Progress rail** of dots (current era stretches into a pill, Apple-style)
 - 💫 **Finale sequence** — multicolor gradient bar fills, title card, then the credits galaxy with the final quote
@@ -41,10 +44,11 @@ CHRONOS is a mobile-first cinematic web experience that takes you from the fiery
 
 Per the hackathon requirements ("meaningful 3D or immersive visual elements"), CHRONOS ships:
 
-1. **Real 3D geometry** on every era — a spinning octahedral artifact crystal (metallic + emissive material), a pulsing torus portal, a starfield of 240 GPU-instanced points with additive blending, and a floating gold-dust particle layer.
-2. **Three.js lights** (point + ambient) react to the era's accent color so the 3D layer color-matches each scene.
-3. **Parallax depth** — the 3D layer sits behind the UI at a different visual plane from the backdrop, giving a genuine stereoscopic feel without heavy postprocessing.
-4. **60fps on mobile** — only ~500 GPU points total, no shadows, no postprocessing, camera is locked (no orbit controls to cause motion sickness).
+1. **Twelve distinct real-time 3D artifacts** — every era gets its own geometry (pyramid for Egypt, dodecahedron "ideal form" for Greece, gear for the Industrial Revolution, wireframe lattice for the Digital Age…), with emissive materials lerped to the era's accent color.
+2. **A custom GLSL "time-tear" transition** — a fullscreen shader displacement pass rips the old era along a molten seam into the new one on every navigation.
+3. **Reactive camera work** — pointer/gyro parallax rig plus a dolly-zoom pulse; Three.js lights (point + ambient) color-match each scene.
+4. **Cinematic post lens** — mipmap-blur bloom, film grain, vignette (auto-disabled on mobile to guarantee 60fps).
+5. **Resilient by design** — an error boundary degrades gracefully if WebGL is unavailable; the canvas mounts once and never rebuilds.
 
 The 3D *serves the story* rather than being the story — which is how award-winning sites actually use WebGL.
 
