@@ -1,4 +1,4 @@
-// CHRONOS data — 12 eras, one AI-generated image per era
+
 export interface Era {
   id: string
   name: string

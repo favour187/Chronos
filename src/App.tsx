@@ -16,10 +16,10 @@ export default function App() {
   const padRef = useRef<{ oscs: OscillatorNode[]; lp: BiquadFilterNode } | null>(null)
   const [muted, setMuted] = useState(false)
 
-  // Gate the menu on ONLY the first-seen images, then warm the rest in the
-  // background. Holding the boot screen hostage to ~4MB of JPEG preloads is
-  // what made mobile feel frozen for seconds — now the user is in after
-  // ~600KB, and later eras stream in while they read the menu and intro.
+
+
+
+
   useEffect(() => {
     const critical = [
       '/images/boot-stars.jpg',
@@ -44,11 +44,11 @@ export default function App() {
     const imgs = critical.map((src) => {
       const img = new Image()
       img.onload = finishOne
-      img.onerror = finishOne // never stall on a missing asset
+      img.onerror = finishOne
       img.src = src
       return img
     })
-    // Background warm-up: no phase logic, browser cache does the rest.
+
     const warm = later.map((src) => { const img = new Image(); img.src = src; return img })
     return () => {
       canceled = true
@@ -57,7 +57,7 @@ export default function App() {
     }
   }, [])
 
-  // Audio setup (single AudioContext, single master gain)
+
   const ensureAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
@@ -68,8 +68,8 @@ export default function App() {
       audioCtxRef.current = c
       masterRef.current = g
 
-      // Ambient C-major pad starts ONCE with the context and lives for the
-      // entire session — no pops or rebirths on each era change.
+
+
       const freqs = [110, 164.81, 220]
       const oscs: OscillatorNode[] = []
       const lp = c.createBiquadFilter()
@@ -97,7 +97,7 @@ export default function App() {
     }
   }, [muted])
 
-  // Softly "brighten" the pad during eras and dim it during menu/credits.
+
   useEffect(() => {
     const p = padRef.current
     if (!p || !audioCtxRef.current) return
@@ -157,7 +157,7 @@ export default function App() {
     whoosh()
   }, [tone, whoosh])
 
-  // Auto-advance intro stages
+
   const [introStage, setIntroStage] = useState(0)
   useEffect(() => {
     if (phase !== 'intro') return
@@ -175,7 +175,7 @@ export default function App() {
     return () => window.clearTimeout(id)
   }, [phase, introStage, chime, warp])
 
-  // When leaving intro, reset stage so a replay works.
+
   useEffect(() => {
     if (phase !== 'intro') setIntroStage(0)
   }, [phase])
@@ -201,13 +201,13 @@ export default function App() {
     ensureAudio()
     chime()
     whoosh()
-    // iOS 13+ requires a user gesture to enable gyroscope parallax.
+
     const doe = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
     if (typeof doe?.requestPermission === 'function') doe.requestPermission().catch(() => {})
     setPhase('intro')
   }, [ensureAudio, chime, whoosh])
 
-  // Jump straight to any era from the progress rail.
+
   const jump = useCallback((i: number) => {
     if (i === eraIdx) return
     ensureAudio()
@@ -216,7 +216,7 @@ export default function App() {
     setEraIdx(i)
   }, [eraIdx, ensureAudio, warp])
 
-  // Touch swipe — works from any phase.
+
   useEffect(() => {
     let sx = 0, sy = 0, t = 0
     const ts = (e: TouchEvent) => { if (e.touches.length !== 1) return; sx = e.touches[0].clientX; sy = e.touches[0].clientY; t = performance.now() }
@@ -239,7 +239,7 @@ export default function App() {
     return () => { window.removeEventListener('touchstart', ts); window.removeEventListener('touchend', te) }
   }, [phase, next, prev, begin])
 
-  // Keyboard
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'ArrowRight' || e.code === 'Space') {
@@ -256,16 +256,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [phase, next, prev, begin])
 
-  // Finale auto-advance
+
   useEffect(() => {
     if (phase !== 'finale') return
     const id = window.setTimeout(() => setPhase('credits'), 6000)
     return () => window.clearTimeout(id)
   }, [phase])
 
-  // Tap-to-advance on the backdrop (mobile-friendly big hit target)
+
   const onStageTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Ignore clicks that originated from buttons or on the left half (back).
+
     const tgt = e.target as HTMLElement
     if (tgt.closest('button')) return
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
@@ -281,9 +281,9 @@ export default function App() {
     <div className="app" data-phase={phase} onClick={onStageTap}>
       <Starfield density={phase === 'boot' || phase === 'menu' ? 220 : 70} />
 
-      {/* The 3D layer is mounted ONCE and lives under every phase that wants
-          immersion — moving it outside per-era blocks prevents WebGL rebuilds
-          (no hitches, no flashes). We hide it during boot/menu. */}
+      {
+
+}
       {phase !== 'boot' && (
         <Safe3D>
           <ImmersiveLayer

@@ -1,6 +1,6 @@
-// Ultra-light 3D overlay: a DIFFERENT artifact per era, portal ring, stardust,
-// gold dust — plus mouse/gyro parallax, a GLSL "time-tear" transition between
-// eras, and a cinematic bloom/vignette lens. Camera-driven: 60fps on phones.
+
+
+
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ScreenQuad } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing'
@@ -8,15 +8,15 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { ERAS } from '../data'
 
-/* ---------- shared imperative state (one canvas, so module singletons) ---------- */
 
-// Pointer / gyro target in normalized device coords (-1..1)
+
+
 const inputTarget = { x: 0, y: 0 }
-// Warp pulse: 1 right after an era change, decays to 0. Drives camera dolly,
-// artifact pop, star-streaks and the time-tear transition.
+
+
 const warpPulse = { v: 0 }
 
-// Cinematic post lens: desktop only (phones keep raw canvas for guaranteed fps).
+
 const CINE_LENS =
   typeof window !== 'undefined' &&
   window.matchMedia('(min-width: 900px) and (pointer: fine)').matches
@@ -27,7 +27,7 @@ interface Props {
   eraIndex: number
 }
 
-// Shared target accent color (hex string) that scene elements lerp toward.
+
 function useAccentTarget(hex: string) {
   const target = useRef(new THREE.Color(hex))
   target.current.set(hex)
@@ -66,7 +66,7 @@ export function ImmersiveLayer({ accent, eraIndex }: Props) {
   )
 }
 
-/* ---------- input: pointer + device orientation ---------- */
+
 
 function InputListener() {
   useEffect(() => {
@@ -89,7 +89,7 @@ function InputListener() {
   return null
 }
 
-/* ---------- camera rig: parallax drift + warp dolly ---------- */
+
 
 function CameraRig({ eraIndex }: { eraIndex: number }) {
   const { camera } = useThree()
@@ -97,16 +97,16 @@ function CameraRig({ eraIndex }: { eraIndex: number }) {
   useFrame((_, dt) => {
     if (last.current !== eraIndex) {
       last.current = eraIndex
-      warpPulse.v = 1 // era changed → fire the pulse
+      warpPulse.v = 1
     }
     warpPulse.v *= Math.exp(-dt * 3.2)
     if (warpPulse.v < 0.001) warpPulse.v = 0
 
-    const k = 1 - Math.pow(0.002, dt) // critically-damped-ish smoothing
+    const k = 1 - Math.pow(0.002, dt)
     camera.position.x = THREE.MathUtils.lerp(camera.position.x, inputTarget.x * 0.85, k)
     camera.position.y = THREE.MathUtils.lerp(camera.position.y, inputTarget.y * 0.5, k)
     camera.position.z = 7 + warpPulse.v * 2.4
-    // Hitchcock dolly-zoom: the lens counter-zooms as we dive through time
+
     const pc = camera as THREE.PerspectiveCamera
     pc.fov = 55 - warpPulse.v * 9
     pc.updateProjectionMatrix()
@@ -115,8 +115,8 @@ function CameraRig({ eraIndex }: { eraIndex: number }) {
   return null
 }
 
-// Tiny invisible component that feeds the latest accent prop into the shared
-// target color each frame, so scene objects can lerp toward it smoothly.
+
+
 function AccentSync({ hex, targetRef }: { hex: string; targetRef: MutableRefObject<THREE.Color> }) {
   useFrame(() => { targetRef.current.set(hex) })
   return null
@@ -133,12 +133,12 @@ function AccentLights({ targetRef }: { targetRef: MutableRefObject<THREE.Color> 
   return <pointLight ref={light1} position={[0, 2, 5]} intensity={2.4} distance={12} />
 }
 
-/* ---------- "time-tear": a GLSL reality-rip between eras ---------- */
-// The old era tears open along a molten gold seam and the new era floods in
-// through the wound. Sits above the CSS backdrop during the warp pulse only;
-// instant swap stays as the fallback when textures aren't ready.
 
-const TEAR_VERT = /* glsl */ `
+
+
+
+
+const TEAR_VERT =  `
 varying vec2 vUv;
 void main() {
   vUv = position.xy * 0.5 + 0.5;
@@ -146,7 +146,7 @@ void main() {
 }
 `
 
-const TEAR_FRAG = /* glsl */ `
+const TEAR_FRAG =  `
 precision highp float;
 varying vec2 vUv;
 uniform sampler2D tex1;
@@ -238,8 +238,8 @@ function TimeTear({ eraIndex }: { eraIndex: number }) {
     [],
   )
 
-  // Warm the texture cache in the background; images are already cached by
-  // the boot preloader, so decoding is cheap.
+
+
   useEffect(() => {
     let alive = true
     const loader = new THREE.TextureLoader()
@@ -293,27 +293,27 @@ function TimeTear({ eraIndex }: { eraIndex: number }) {
   )
 }
 
-/* ---------- the star of the show: a bespoke artifact per era ---------- */
-// Each era gets its own geometry + spin personality. The shape DOES the
-// storytelling: this is what judges remember.
+
+
+
 
 type ArtifactKind =
   | 'planetoid' | 'shard' | 'flint' | 'pyramid' | 'platonic' | 'column'
   | 'block' | 'flow' | 'gear' | 'mesh' | 'hyperloop' | 'starorb'
 
 const ERA_ARTIFACTS: { kind: ArtifactKind; spin: number; scale: number }[] = [
-  { kind: 'planetoid', spin: 0.5, scale: 1.0 },   // Birth of Earth — molten world
-  { kind: 'shard', spin: 0.65, scale: 1.05 },     // Dinosaur Age — fossil shard
-  { kind: 'flint', spin: 0.7, scale: 0.9 },       // Early Humans — struck flint
-  { kind: 'pyramid', spin: 0.4, scale: 1.1 },     // Ancient Egypt — monument
-  { kind: 'platonic', spin: 0.5, scale: 0.95 },   // Ancient Greece — ideal form
-  { kind: 'column', spin: 0.44, scale: 1.0 },     // Rome — engineered column
-  { kind: 'block', spin: 0.5, scale: 0.95 },      // Medieval — cathedral stone
-  { kind: 'flow', spin: 0.6, scale: 0.9 },        // Renaissance — flowing genius
-  { kind: 'gear', spin: 1.1, scale: 1.0 },        // Industrial — the machine wakes
-  { kind: 'mesh', spin: 0.6, scale: 1.0 },        // Digital — network lattice
-  { kind: 'hyperloop', spin: 0.75, scale: 0.95 }, // Future — the engineered loop
-  { kind: 'starorb', spin: 0.3, scale: 1.0 },     // Cosmic — the universe observing
+  { kind: 'planetoid', spin: 0.5, scale: 1.0 },
+  { kind: 'shard', spin: 0.65, scale: 1.05 },
+  { kind: 'flint', spin: 0.7, scale: 0.9 },
+  { kind: 'pyramid', spin: 0.4, scale: 1.1 },
+  { kind: 'platonic', spin: 0.5, scale: 0.95 },
+  { kind: 'column', spin: 0.44, scale: 1.0 },
+  { kind: 'block', spin: 0.5, scale: 0.95 },
+  { kind: 'flow', spin: 0.6, scale: 0.9 },
+  { kind: 'gear', spin: 1.1, scale: 1.0 },
+  { kind: 'mesh', spin: 0.6, scale: 1.0 },
+  { kind: 'hyperloop', spin: 0.75, scale: 0.95 },
+  { kind: 'starorb', spin: 0.3, scale: 1.0 },
 ]
 
 function artifactGeometry(kind: ArtifactKind) {
@@ -348,7 +348,7 @@ function EraArtifact({ eraIndex, targetRef }: { eraIndex: number; targetRef: Mut
       g.current.rotation.y = t * cfg.spin
       g.current.rotation.x = Math.sin(t * 0.4) * 0.12
       g.current.position.y = -1.1 + Math.sin(t * 1.1) * 0.14
-      // warp-pop: artifact bursts in on era change
+
       const s = cfg.scale * (1 + warpPulse.v * 0.6)
       g.current.scale.setScalar(0.55 * s)
     }
@@ -398,14 +398,14 @@ function EraArtifact({ eraIndex, targetRef }: { eraIndex: number; targetRef: Mut
           />
         )}
       </mesh>
-      {/* cosmic era gets a wireframe star-shell around the orb */}
+      {}
       {cfg.kind === 'starorb' && (
         <mesh ref={shell}>
           <icosahedronGeometry args={[0.85, 1]} />
           <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.25} />
         </mesh>
       )}
-      {/* gear era gets teeth: a second flat dark ring reads as machinery */}
+      {}
       {cfg.kind === 'gear' && (
         <mesh ref={shell} rotation={[0, 0, 0]}>
           <torusGeometry args={[0.72, 0.05, 8, 12]} />
@@ -416,7 +416,7 @@ function EraArtifact({ eraIndex, targetRef }: { eraIndex: number; targetRef: Mut
   )
 }
 
-/* ---------- supporting cast ---------- */
+
 
 function Stars({ targetRef }: { targetRef: MutableRefObject<THREE.Color> }) {
   const ref = useRef<THREE.Points>(null)
@@ -438,7 +438,7 @@ function Stars({ targetRef }: { targetRef: MutableRefObject<THREE.Color> }) {
     mat.color.copy(cur)
     const p = ref.current.geometry.attributes.position as THREE.BufferAttribute
     const a = p.array as Float32Array
-    // stars rush backward during the warp pulse — traveling through time
+
     const speed = 0.25 + warpPulse.v * 14
     for (let i = 0; i < a.length; i += 3) {
       a[i] -= speed * dt

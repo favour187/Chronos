@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 
 interface Props { density?: number }
 
-/**
- * Ultra-light 2D canvas starfield — zero GPU cost, 60fps safe on phones.
- * Drifts slowly leftward with a gentle twinkle. No per-frame allocations.
- */
+
+
+
+
 export function Starfield({ density = 200 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -44,7 +44,7 @@ export function Starfield({ density = 200 }: Props) {
       const dt = Math.min(0.05, (t - last) / 1000)
       last = t
       ctx.clearRect(0, 0, w, h)
-      const speed = (window.innerWidth < 900 ? 28 : 60) // px/s at dpr=1, scaled below
+      const speed = (window.innerWidth < 900 ? 28 : 60)
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i]
         s.x -= s.z * speed * dt * (window.devicePixelRatio || 1)
